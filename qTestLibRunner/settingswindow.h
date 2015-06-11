@@ -19,12 +19,18 @@ public:
 private:
     Ui::SettingsWindow *ui;
     Settings *settings;
+    TestExecutables *testExecutables;
 
+    void loadTestExecutablesInList();
 signals:
 
 public slots:
 private slots:
     void on_buttonBox_accepted();
+    void on_toolButton_clicked();
+    void on_pushButton_clicked();
+
+
 };
 
 #endif // SETTINGSWINDOW_H

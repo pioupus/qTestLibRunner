@@ -61,7 +61,7 @@ public:
     ~MainWindow();
 
 
-    bool runTests(QString directory);
+    bool runTests();
     QList<TestCaseEntry> parseXML(QString xmlinput);
     void listTestResults(QList<TestCaseEntry> testResults);
 
@@ -82,10 +82,14 @@ private:
     Settings *settings;
     QSettings *sysSettings;
     RecentFiles *recentFiles;
+    int timerId;
 
     void saveAs(QString fileName);
     void openFile(QString fileName);
     void fillRecenFileMenu(RecentFiles *recentFiles);
+
+protected:
+    void timerEvent(QTimerEvent *event);
 };
 
 

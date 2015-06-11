@@ -4,14 +4,39 @@
 #include <QString>
 #include <QStringList>
 #include <QDateTime>
+#include <QSettings>
 
 class TestExecutableEntry{
 public:
+
+
     QString workingDirectory;
     QString pathOfExectuable;
     QDateTime modificationDate;
     bool active;
 };
+
+class TestExecutables {
+private:
+
+
+public:
+    TestExecutables();
+    TestExecutables(QString rootPath, QString executablePath);
+    TestExecutables(TestExecutables &testExecutables);
+
+    void load(TestExecutables &testExecutables);
+    bool scanDirectory();
+    bool executablesChanged();
+    void saveToQSettings(QSettings &qsetting);
+
+    QList<TestExecutableEntry> executables;
+    void loadFromQSettings(QSettings &qsetting);
+    QString executableFilter;
+    QString rootPath;
+};
+
+
 
 class Settings
 {
@@ -38,8 +63,9 @@ public:
 
     QString     workingPathForTestExecutable;
     QString     sourceRootDirectory;
+    bool        runTestOnExecutableChange;
 
-    QList<TestExecutableEntry> testExecutableList;
+    TestExecutables testExecutables;
 
 };
 

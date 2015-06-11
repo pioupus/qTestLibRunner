@@ -33,10 +33,13 @@ MainWindow::MainWindow(QWidget *parent) :
                         this, SLOT(on_actionSave_as_Triggered(bool)));
     QObject::connect(ui->actionRun, SIGNAL(triggered(bool)),
                         this, SLOT(on_btnRun_clicked()));
+
+    timerId = startTimer(1000);
 }
 
 MainWindow::~MainWindow()
 {
+    killTimer(timerId);
     sysSettings->setValue("recentFiles",recentFiles->recentFiles);
     settings->saveToFile();
     delete recentFiles;
@@ -47,7 +50,7 @@ MainWindow::~MainWindow()
 
 void MainWindow::on_btnRun_clicked()
 {
-    runTests("");
+    runTests();
 }
 
 void MainWindow::openFile(QString fileName)
@@ -93,6 +96,15 @@ void MainWindow::fillRecenFileMenu(RecentFiles *recentFiles)
     }
 
 
+}
+
+void MainWindow::timerEvent(QTimerEvent *event)
+{
+    if (settings->runTestOnExecutableChange){
+        if (settings->testExecutables.executablesChanged()){
+            runTests();
+        }
+    }
 }
 
 void MainWindow::on_actionSave_as_Triggered(bool checked){
@@ -156,8 +168,8 @@ void MainWindow::on_actionEditSettings_Triggered(bool checked)
 
 #endif
 
-bool MainWindow::runTests(QString directory){
-    (void) directory;
+bool MainWindow::runTests(){
+
     QProcess testProcess;
     QStringList env = QProcess::systemEnvironment();
     QStringList paths = settings->pathEnvironment;
@@ -178,26 +190,39 @@ bool MainWindow::runTests(QString directory){
             break;
         }
     }
-    testProcess.setEnvironment(env);
-    testProcess.setWorkingDirectory(settings->workingPathForTestExecutable);
-    testProcess.start(settings->searchPathForTestExecutable, QStringList() << "-xml");
-    if (!testProcess.waitForStarted()){
-        qDebug() << "finished problem";
-        return false;
-    }
-    qDebug() << "Test Started";
-    if (!testProcess.waitForFinished()){
-        qDebug() << "finished problem";
-        return false;
-    }
-    qDebug() << "Test Finished";
-    QByteArray result = testProcess.readAllStandardOutput();
-    QByteArray err = testProcess.readAllStandardError();
+    QByteArray stdout;
 
-    qDebug() << "stdErr: " << err;
-    //qDebug() << result;
+    for(int i = 0;i<settings->testExecutables.executables.count();i++){
+        testProcess.setEnvironment(env);
+        QString program = settings->testExecutables.executables[i].pathOfExectuable;
+        QString workingdir = settings->testExecutables.executables[i].workingDirectory;
+        if (workingdir == ""){
+            workingdir = settings->workingPathForTestExecutable;
+        }
+        testProcess.setWorkingDirectory(workingdir);
+        testProcess.start(program, QStringList() << "-xml");
+        if (!testProcess.waitForStarted()){
+            qDebug() << "finished problem";
+            return false;
+        }
+        qDebug() << "Test Started";
+        if (!testProcess.waitForFinished()){
+            qDebug() << "finished problem";
+            return false;
+        }
+        qDebug() << "Test Finished";
+        QByteArray stdout_ = testProcess.readAllStandardOutput();
+        if (QString(stdout_)==""){
+            qWarning() << "program: "+program+" has no output on stdout";
+        }
 
-    testResults = parseXML(QString(result));
+        stdout += stdout_;
+        QByteArray err = testProcess.readAllStandardError();
+
+        qDebug() << "stdErr: " << err;
+        //qDebug() << result;
+    }
+    testResults = parseXML(QString(stdout));
     listTestResults(testResults);
     return true;
 }
