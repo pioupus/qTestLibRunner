@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>400</width>
-    <height>300</height>
+    <width>905</width>
+    <height>414</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -15,20 +15,28 @@
   </property>
   <widget class="QWidget" name="centralWidget">
    <layout class="QGridLayout" name="gridLayout">
-    <item row="1" column="0">
+    <item row="0" column="0">
      <widget class="QTreeWidget" name="treeWidget">
       <column>
        <property name="text">
-        <string notr="true">1</string>
+        <string notr="true">Test</string>
        </property>
       </column>
-     </widget>
-    </item>
-    <item row="0" column="0">
-     <widget class="QToolButton" name="btnRun">
-      <property name="text">
-       <string>run</string>
-      </property>
+      <column>
+       <property name="text">
+        <string>Status</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>Duration</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>Description</string>
+       </property>
+      </column>
      </widget>
     </item>
    </layout>
@@ -38,7 +46,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>400</width>
+     <width>905</width>
      <height>21</height>
     </rect>
    </property>
@@ -46,9 +54,16 @@
     <property name="title">
      <string>Settings</string>
     </property>
+    <widget class="QMenu" name="menuRecent_Files">
+     <property name="title">
+      <string>Recent Files</string>
+     </property>
+     <addaction name="actionLast"/>
+    </widget>
     <addaction name="actionEditSettings"/>
     <addaction name="actionLoad_from_File"/>
     <addaction name="actionSave_as"/>
+    <addaction name="menuRecent_Files"/>
    </widget>
    <widget class="QMenu" name="menuTests">
     <property name="title">
@@ -95,6 +110,11 @@
    </property>
    <property name="shortcut">
     <string>F9</string>
+   </property>
+  </action>
+  <action name="actionLast">
+   <property name="text">
+    <string>last</string>
    </property>
   </action>
  </widget>

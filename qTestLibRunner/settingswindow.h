@@ -2,24 +2,29 @@
 #define SETTINGSWINDOW_H
 
 #include <QDialog>
+#include "settings.h"
 
 namespace Ui {
-    class Settings;
+    class SettingsWindow;
 }
 
 class SettingsWindow : public QDialog
 {
     Q_OBJECT
 public:
-    explicit SettingsWindow(QWidget *parent = 0);
+    SettingsWindow(Settings *settings, QWidget *parent = 0);
+
     ~SettingsWindow();
 
 private:
-    Ui::Settings *ui;
+    Ui::SettingsWindow *ui;
+    Settings *settings;
 
 signals:
 
 public slots:
+private slots:
+    void on_buttonBox_accepted();
 };
 
 #endif // SETTINGSWINDOW_H

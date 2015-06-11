@@ -8,18 +8,40 @@
 #include <QDomDocument>
 #include <QFont>
 #include <QDir>
+#include <QFileDialog>
+
+#define MAXRECENTFILESCOUNT 10
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow)
 {
+    QString actualFileName;
     ui->setupUi(this);
+    sysSettings = new QSettings{"config.conf", QSettings::IniFormat};
+    actualFileName = sysSettings->value("lastProjectsettingsFile","myProjectSetting.qtr").toString();
+    settings = new Settings{actualFileName};
+    recentFiles = new RecentFiles(sysSettings->value("recentFiles","").toStringList());
+    recentFiles->addToRecentFiles(actualFileName);
+    fillRecenFileMenu(recentFiles);
+    settings->readFromFile();
     QObject::connect(ui->actionEditSettings, SIGNAL(triggered(bool)),
                         this, SLOT(on_actionEditSettings_Triggered(bool)));
+    QObject::connect(ui->actionLoad_from_File, SIGNAL(triggered(bool)),
+                        this, SLOT(on_actionLoad_from_File_Triggered(bool)));
+    QObject::connect(ui->actionSave_as, SIGNAL(triggered(bool)),
+                        this, SLOT(on_actionSave_as_Triggered(bool)));
+    QObject::connect(ui->actionRun, SIGNAL(triggered(bool)),
+                        this, SLOT(on_btnRun_clicked()));
 }
 
 MainWindow::~MainWindow()
 {
+    sysSettings->setValue("recentFiles",recentFiles->recentFiles);
+    settings->saveToFile();
+    delete recentFiles;
+    delete settings;
+    delete sysSettings;
     delete ui;
 }
 
@@ -28,10 +50,73 @@ void MainWindow::on_btnRun_clicked()
     runTests("");
 }
 
-void MainWindow::on_actionEditSettings_Triggered(bool checked)
+void MainWindow::openFile(QString fileName)
+{
+    settings->openNewFile(fileName);
+    recentFiles->addToRecentFiles(fileName);
+    fillRecenFileMenu(recentFiles);
+    sysSettings->setValue("lastProjectsettingsFile",fileName);
+}
+
+void MainWindow::saveAs(QString fileName)
+{
+    settings->saveToFileAs(fileName);
+    recentFiles->addToRecentFiles(fileName);
+    fillRecenFileMenu(recentFiles);
+    sysSettings->setValue("lastProjectsettingsFile",fileName);
+}
+
+void MainWindow::on_actionLoad_from_File_Triggered(bool checked){
+    (void)checked;
+    QFileDialog dial(this);
+    dial.setNameFilter(tr("QTest Runner Settings (*.qtr)"));
+    dial.setFileMode(QFileDialog::ExistingFile);
+    if (dial.exec()) {
+        openFile(dial.selectedFiles()[0]);
+    }
+}
+
+
+void MainWindow::fillRecenFileMenu(RecentFiles *recentFiles)
+{
+    QList<QAction *> actionList;
+
+    actionList = ui->menuRecent_Files->actions();
+    for (int i =0;i<actionList.count();i++){
+        ui->menuRecent_Files->removeAction(actionList[i]);
+    }
+
+    for (int i =1;i<recentFiles->recentFiles.count();i++){
+        QAction * action = ui->menuRecent_Files->addAction(recentFiles->recentFiles[i]);
+        QObject::connect(action, SIGNAL(triggered(bool)),
+                            this, SLOT(on_actionRecentFile_Triggered(bool)));
+    }
+
+
+}
+
+void MainWindow::on_actionSave_as_Triggered(bool checked){
+    (void)checked;
+    QFileDialog dial(this);
+    dial.setNameFilter(tr("QTest Runner Settings (*.qtr)"));
+    dial.setFileMode(QFileDialog::AnyFile);
+    if (dial.exec()) {
+        saveAs(dial.selectedFiles()[0]);
+    }
+}
+
+void MainWindow::on_actionRecentFile_Triggered(bool checked)
 {
     (void)checked;
-    settingsWindow = new SettingsWindow(this);
+    QObject * senderObj = QObject::sender();
+    if( QAction* senderAction = dynamic_cast< QAction* >( senderObj ) ){
+        openFile(senderAction->text());
+    }
+}
+
+void MainWindow::on_actionEditSettings_Triggered(bool checked)
+{
+    settingsWindow = new SettingsWindow{settings};
     settingsWindow->show();
 }
 
@@ -75,11 +160,15 @@ bool MainWindow::runTests(QString directory){
     (void) directory;
     QProcess testProcess;
     QStringList env = QProcess::systemEnvironment();
-    QStringList paths;
+    QStringList paths = settings->pathEnvironment;
     QList<TestCaseEntry> testResults;
 
-    paths << "../src/debug/";
-    paths << "../../../libs/PythonQt3.0/lib";
+
+    for(int i=0;i<paths.count();i++){
+        qDebug() << paths[i];
+    }
+    //qDebug() << "../src/debug/";
+    //paths << "../../../libs/PythonQt3.0/lib";
     for (int i=0;i<env.count();i++){
         if (env[i].indexOf("PATH") == 0){
             //qDebug() << env.at(i);
@@ -90,8 +179,8 @@ bool MainWindow::runTests(QString directory){
         }
     }
     testProcess.setEnvironment(env);
-    testProcess.setWorkingDirectory("C:\\Users\\ark\\entwicklung\\qt\\crystalTestFrameworkApp\\builds\\crystalTestFrameworkApp-Desktop_Qt_5_4_1_MinGW_32bit-Debug\\tests");
-    testProcess.start("C:/Users/ark/entwicklung/qt/crystalTestFrameworkApp/builds/crystalTestFrameworkApp-Desktop_Qt_5_4_1_MinGW_32bit-Debug/tests/debug/tests.exe", QStringList() << "-xml");
+    testProcess.setWorkingDirectory(settings->workingPathForTestExecutable);
+    testProcess.start(settings->searchPathForTestExecutable, QStringList() << "-xml");
     if (!testProcess.waitForStarted()){
         qDebug() << "finished problem";
         return false;
@@ -108,22 +197,11 @@ bool MainWindow::runTests(QString directory){
     qDebug() << "stdErr: " << err;
     //qDebug() << result;
 
-    testResults = parseXML(QString(result),testProcess.workingDirectory());
+    testResults = parseXML(QString(result));
     listTestResults(testResults);
     return true;
 }
-#if  0
-QString getXMLAttribute(QXmlStreamReader xml, QString Name){
-    foreach(const QXmlStreamAttribute &attr, xml.attributes()) {
-        if (attr.name().toString() == QLatin1String("QStringName")) {
-            QString attribute_value = attr.value().toString();
-            return(attribute_value);
-        }
-    }
-    return "";
-}
 
-#endif
 QString removeXMLEncodingTag(QString in){
     QString xmlEcodingTag;
     while (in.indexOf("<?xml") > -1){
@@ -138,7 +216,7 @@ QString removeXMLEncodingTag(QString in){
 //<?xml version="1.0" encoding="UTF-8"?>
 }
 
-QList<TestCaseEntry> MainWindow::parseXML(QString xmlinput,QString testExecutableWorkingDirectory){
+QList<TestCaseEntry> MainWindow::parseXML(QString xmlinput){
 #if 0
     <?xml version="1.0" encoding="UTF-8"?>
     <TestCase name="TestScriptEngine">
@@ -209,7 +287,7 @@ QList<TestCaseEntry> MainWindow::parseXML(QString xmlinput,QString testExecutabl
             TestCaseEntry testCaseEntry;
             testCaseEntry.name = testCase.attribute("name");
             testCaseEntry.duration = testCase.firstChildElement("Duration").attribute("msecs");
-            testCaseEntry.testSourceDirectory = testExecutableWorkingDirectory;
+            testCaseEntry.testSourceDirectory = settings->sourceRootDirectory;
             if (testCase.tagName() == "TestCase"){
                 QDomNode testFunctions = testCase.firstChild();
 
@@ -246,11 +324,7 @@ QList<TestCaseEntry> MainWindow::parseXML(QString xmlinput,QString testExecutabl
                 }
             }
             testCasesList.append(testCaseEntry);
-#if 0
-            <Incident type="pass" file="" line="0" />
-                <Duration msecs="0.007589"/>
-            </TestFunction>
-#endif
+
         }
         testCases = testCases.nextSibling();
     }
@@ -260,7 +334,7 @@ QList<TestCaseEntry> MainWindow::parseXML(QString xmlinput,QString testExecutabl
 
 void MainWindow::listTestResults(QList<TestCaseEntry> testResults)
 {
-    QFont font("Courier");
+    QFont font("consolas");
     this->ui->treeWidget->clear();
     this->ui->treeWidget->setColumnCount(4);
     //0:name
@@ -326,14 +400,43 @@ void MainWindow::on_treeWidget_itemDoubleClicked(QTreeWidgetItem *item, int colu
     {
         if(itemWithData->testFunctionEntry.fileName != ""){
             QStringList arguments;
-            QString path = "C:/Qt/Qt5.4.1/Tools/QtCreator/bin/";
+            //QString path = "C:/Qt/Qt5.4.1/Tools/QtCreator/bin/";
             QString sourceDirectory = itemWithData->testCaseEntry.testSourceDirectory;
             QDir qpath(sourceDirectory);
             QString sourceFileAbs = sourceDirectory+'/'+itemWithData->testFunctionEntry.fileName;//qpath.relativeFilePath(itemWithData->testFunctionEntry.fileName);
             //qDebug() << sourceFileAbs;
             arguments <<"-client" <<sourceFileAbs+':'+itemWithData->testFunctionEntry.lineNumber;
-            QProcess::startDetached(path+"qtcreator.exe", arguments);
+            QProcess::startDetached(settings->qtCreatorPath, arguments);
         }
     }
 }
+
+
+
+RecentFiles::RecentFiles(QStringList initList)
+{
+    this->recentFiles.append(initList);
+}
+
+RecentFiles::~RecentFiles()
+{
+
+}
+
+void RecentFiles::addToRecentFiles(QString fileName)
+{
+    int index = recentFiles.indexOf(fileName);
+    if (index > -1){
+        recentFiles.removeAt(index);
+    }
+    recentFiles.insert(0,fileName);
+    if (recentFiles.count() > MAXRECENTFILESCOUNT){
+        recentFiles.removeAt(recentFiles.count()-1);
+    }
+
+}
+
+
+
+
 
