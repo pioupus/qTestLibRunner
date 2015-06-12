@@ -106,6 +106,7 @@ void MainWindow::fillRecenFileMenu(RecentFiles *recentFiles)
 
 void MainWindow::timerEvent(QTimerEvent *event)
 {
+    (void)event;
     if (settings->getRunTestOnExecutableChange()){
         if (settings->testExecutables.executablesChanged()){
             runTests();
@@ -134,6 +135,7 @@ void MainWindow::on_actionRecentFile_Triggered(bool checked)
 
 void MainWindow::on_actionEditSettings_Triggered(bool checked)
 {
+    (void)checked;
     settingsWindow = new SettingsWindow{settings};
     settingsWindow->show();
 }
