@@ -190,7 +190,7 @@ bool MainWindow::runTests(){
             break;
         }
     }
-    QByteArray stdout;
+    QByteArray testOutPut;
 
     for(int i = 0;i<settings->testExecutables.executables.count();i++){
         testProcess.setEnvironment(env);
@@ -216,13 +216,13 @@ bool MainWindow::runTests(){
             qWarning() << "program: "+program+" has no output on stdout";
         }
 
-        stdout += stdout_;
+        testOutPut += stdout_;
         QByteArray err = testProcess.readAllStandardError();
 
         qDebug() << "stdErr: " << err;
         //qDebug() << result;
     }
-    testResults = parseXML(QString(stdout));
+    testResults = parseXML(QString(testOutPut));
     listTestResults(testResults);
     return true;
 }
