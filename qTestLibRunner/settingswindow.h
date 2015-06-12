@@ -19,6 +19,7 @@ public:
 private:
     Ui::SettingsWindow *ui;
     Settings *settings;
+    int test;
     TestExecutables *testExecutables;
 
     void loadTestExecutablesInList();

@@ -18,6 +18,10 @@ MainWindow::MainWindow(QWidget *parent) :
 {
     QString actualFileName;
     ui->setupUi(this);
+    statusLabel = new QLabel(ui->statusBar);
+
+    statusLabel->setMinimumHeight(20);
+    ui->statusBar->setMinimumHeight(30);
     sysSettings = new QSettings{"config.conf", QSettings::IniFormat};
     actualFileName = sysSettings->value("lastProjectsettingsFile","myProjectSetting.qtr").toString();
     settings = new Settings{actualFileName};
@@ -35,6 +39,7 @@ MainWindow::MainWindow(QWidget *parent) :
                         this, SLOT(on_btnRun_clicked()));
 
     timerId = startTimer(1000);
+
 }
 
 MainWindow::~MainWindow()
@@ -45,6 +50,7 @@ MainWindow::~MainWindow()
     delete recentFiles;
     delete settings;
     delete sysSettings;
+    delete statusLabel;
     delete ui;
 }
 
@@ -100,7 +106,7 @@ void MainWindow::fillRecenFileMenu(RecentFiles *recentFiles)
 
 void MainWindow::timerEvent(QTimerEvent *event)
 {
-    if (settings->runTestOnExecutableChange){
+    if (settings->getRunTestOnExecutableChange()){
         if (settings->testExecutables.executablesChanged()){
             runTests();
         }
@@ -172,58 +178,87 @@ bool MainWindow::runTests(){
 
     QProcess testProcess;
     QStringList env = QProcess::systemEnvironment();
-    QStringList paths = settings->pathEnvironment;
+    QStringList paths = settings->getPathEnvironment();
     QList<TestCaseEntry> testResults;
+    bool totalSuccess = true;
 
 
-    for(int i=0;i<paths.count();i++){
-        qDebug() << paths[i];
-    }
-    //qDebug() << "../src/debug/";
+    //paths << "../src/debug/";
     //paths << "../../../libs/PythonQt3.0/lib";
-    for (int i=0;i<env.count();i++){
-        if (env[i].indexOf("PATH") == 0){
-            //qDebug() << env.at(i);
-            for(int n = 0;n<paths.count();n++){
-                env[i] = env[i]+';'+paths[n];
-            }
-            break;
+    ui->txtLog->clear();
+    ui->txtLog->appendHtml("<b>start: </b>"+QDateTime::currentDateTime().toString());
+    ui->txtLog->appendHtml("");
+    if (paths.count() > 0){
+        bool pathNotfound = true;
+        ui->txtLog->appendHtml("<b>Adding to Path:</b>");
+
+        for(int i=0;i<paths.count();i++){
+            //qDebug() << paths[i];
+            ui->txtLog->appendPlainText(paths[i]);
+
         }
+        for (int i=0;i<env.count();i++){
+            if (env[i].indexOf("PATH=") == 0){
+                pathNotfound = false;
+               // qDebug() << env.at(i);
+                for(int n = 0;n<paths.count();n++){
+                    env[i] = env[i]+';'+paths[n];
+                }
+                break;
+            }
+        }
+        if(pathNotfound){
+            QString path="";
+            for(int n = 0;n<paths.count();n++){
+                if (n > 0){
+                    path = path+';';
+                }
+                path = path+paths[n];
+            }
+            env.append("PATH="+path);
+        }
+        ui->txtLog->appendPlainText("");
     }
+    testProcess.setEnvironment(env);
     QByteArray testOutPut;
 
     for(int i = 0;i<settings->testExecutables.executables.count();i++){
-        testProcess.setEnvironment(env);
+
         QString program = settings->testExecutables.executables[i].pathOfExectuable;
         QString workingdir = settings->testExecutables.executables[i].workingDirectory;
         if (workingdir == ""){
-            workingdir = settings->workingPathForTestExecutable;
+            workingdir = settings->getWorkingPathForTestExecutableAbsolute(program);
         }
+        ui->txtLog->appendHtml("<b>Running:</b> <tab id=t1>\t\t\t\t"+program);
+        ui->txtLog->appendHtml("<b>in Directory:</b> <tab to=t1>\t\t\t\t"+workingdir);
         testProcess.setWorkingDirectory(workingdir);
         testProcess.start(program, QStringList() << "-xml");
         if (!testProcess.waitForStarted()){
-            qDebug() << "finished problem";
-            return false;
+            ui->txtLog->appendHtml("<font color=\"red\">program didnt start well</font>");
+            totalSuccess = false;
         }
-        qDebug() << "Test Started";
         if (!testProcess.waitForFinished()){
-            qDebug() << "finished problem";
-            return false;
+            ui->txtLog->appendHtml("<font color=\"red\">program didnt finish within timeout</font>");
+            totalSuccess = false;
+            //qDebug() << "finished problem";
         }
-        qDebug() << "Test Finished";
         QByteArray stdout_ = testProcess.readAllStandardOutput();
         if (QString(stdout_)==""){
-            qWarning() << "program: "+program+" has no output on stdout";
+            ui->txtLog->appendHtml("<font color=\"red\">program didnt generate output on stdout</font>");
+            totalSuccess = false;
         }
 
         testOutPut += stdout_;
-        QByteArray err = testProcess.readAllStandardError();
 
-        qDebug() << "stdErr: " << err;
-        //qDebug() << result;
+        QByteArray err = testProcess.readAllStandardError();
+        if (QString(err)!=""){
+            ui->txtLog->appendHtml("<font color=\"red\">program wrote on stderr: " +QString(err)+"</font>");
+            totalSuccess = false;
+        }
+        testResults.append(parseXML(QString(testOutPut),program,workingdir));
+        ui->txtLog->appendPlainText("");
     }
-    testResults = parseXML(QString(testOutPut));
-    listTestResults(testResults);
+    listTestResults(testResults,totalSuccess);
     return true;
 }
 
@@ -241,7 +276,7 @@ QString removeXMLEncodingTag(QString in){
 //<?xml version="1.0" encoding="UTF-8"?>
 }
 
-QList<TestCaseEntry> MainWindow::parseXML(QString xmlinput){
+QList<TestCaseEntry> MainWindow::parseXML(QString xmlinput, QString testExecutable, QString testExecutableWorkingDir){
 #if 0
     <?xml version="1.0" encoding="UTF-8"?>
     <TestCase name="TestScriptEngine">
@@ -312,7 +347,7 @@ QList<TestCaseEntry> MainWindow::parseXML(QString xmlinput){
             TestCaseEntry testCaseEntry;
             testCaseEntry.name = testCase.attribute("name");
             testCaseEntry.duration = testCase.firstChildElement("Duration").attribute("msecs");
-            testCaseEntry.testSourceDirectory = settings->sourceRootDirectory;
+            testCaseEntry.testSourceDirectory = settings->getSourceRootDirectoryAbsolute(testExecutable,testExecutableWorkingDir);
             if (testCase.tagName() == "TestCase"){
                 QDomNode testFunctions = testCase.firstChild();
 
@@ -357,7 +392,7 @@ QList<TestCaseEntry> MainWindow::parseXML(QString xmlinput){
     return testCasesList;
 }
 
-void MainWindow::listTestResults(QList<TestCaseEntry> testResults)
+void MainWindow::listTestResults(QList<TestCaseEntry> testResults, bool totalSuccess)
 {
     QFont font("consolas");
     this->ui->treeWidget->clear();
@@ -393,13 +428,13 @@ void MainWindow::listTestResults(QList<TestCaseEntry> testResults)
                 testFunctionItem->setBackground(1,QBrush(Qt::green));
             }else{
                 testCasePassed = false;
+                totalSuccess = false;
                 testFunctionItem->setText(1,"Fail");
                 testFunctionItem->setBackground(0,QBrush(Qt::red));
                 testFunctionItem->setBackground(1,QBrush(Qt::red));
                 testCaseItem->setExpanded(true);
 
             }
-
             testCaseItem->addChild(testFunctionItem);
         }
         if (testCasePassed){
@@ -416,6 +451,32 @@ void MainWindow::listTestResults(QList<TestCaseEntry> testResults)
     }
     this->ui->treeWidget->sortItems(1,Qt::AscendingOrder);//Qt::DescendingOrder
 
+    if (totalSuccess){
+        QPalette sample_palette;
+        sample_palette.setColor(QPalette::Window, Qt::green);
+        sample_palette.setColor(QPalette::WindowText, Qt::black);
+
+        statusLabel->setAutoFillBackground(true);
+        statusLabel->setPalette(sample_palette);
+
+        statusLabel->setText("OK");
+        //QIcon icon = QIcon(":/icons/smile-happy.ico");
+        QIcon icon = QIcon(":/icons/smile-happy.ico");
+        setWindowIcon(icon);
+    }else{
+        QPalette sample_palette;
+        sample_palette.setColor(QPalette::Window, Qt::red);
+        sample_palette.setColor(QPalette::WindowText, Qt::black);
+
+        statusLabel->setAutoFillBackground(true);
+        statusLabel->setPalette(sample_palette);
+        statusLabel->setText("Fail");
+        QIcon icon = QIcon(":/icons/smile-sad.ico");
+        setWindowIcon(icon);
+
+    }
+
+
 }
 
 void MainWindow::on_treeWidget_itemDoubleClicked(QTreeWidgetItem *item, int column)
@@ -431,7 +492,7 @@ void MainWindow::on_treeWidget_itemDoubleClicked(QTreeWidgetItem *item, int colu
             QString sourceFileAbs = sourceDirectory+'/'+itemWithData->testFunctionEntry.fileName;//qpath.relativeFilePath(itemWithData->testFunctionEntry.fileName);
             //qDebug() << sourceFileAbs;
             arguments <<"-client" <<sourceFileAbs+':'+itemWithData->testFunctionEntry.lineNumber;
-            QProcess::startDetached(settings->qtCreatorPath, arguments);
+            QProcess::startDetached(settings->getQtCreatorPath(), arguments);
         }
     }
 }

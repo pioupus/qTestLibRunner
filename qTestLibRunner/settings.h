@@ -41,7 +41,18 @@ public:
 class Settings
 {
 private:
-    QString fileName;
+    QString settingsFileName;
+
+
+    QString     qtCreatorPath;
+    QStringList pathEnvironment;
+
+    QString     searchMaskForTestExecutable;
+    QString     searchPathForTestExecutable;
+
+    QString     workingPathForTestExecutable;
+    QString     sourceRootDirectory;
+    bool        runTestOnExecutableChange;
 public:
     Settings(QString fileName);
 
@@ -55,17 +66,35 @@ public:
 
     bool saveToFileAs(QString fileName);
 
-    QString     qtCreatorPath;
-    QStringList pathEnvironment;
 
-    QString     searchMaskForTestExecutable;
-    QString     searchPathForTestExecutable;
-
-    QString     workingPathForTestExecutable;
-    QString     sourceRootDirectory;
-    bool        runTestOnExecutableChange;
 
     TestExecutables testExecutables;
+
+    QString getQtCreatorPath() const;
+    void setQtCreatorPath(const QString &value);
+    QStringList getPathEnvironment() const;
+    void setPathEnvironment(const QStringList &value);
+    QString getSearchMaskForTestExecutable() const;
+    void setSearchMaskForTestExecutable(const QString &value);
+
+    QString getSearchPathForTestExecutableRelative() const;
+    QString getSearchPathForTestExecutableAbsolute(QString testExecutable, QString testExecutableWorkingPath) const;
+    void setSearchPathForTestExecutable(const QString &value);
+
+    QString getWorkingPathForTestExecutableRelative() const;
+    QString getWorkingPathForTestExecutableAbsolute(QString testExecutable) const;
+    void setWorkingPathForTestExecutable(const QString &value);
+
+    QString getAbsolutePath(QString relative, QString testExecutable, QString testExecutableWorkingPath) const;
+    QString getSourceRootDirectoryRelative() const;
+    QString getSourceRootDirectoryAbsolute(QString testExecutable, QString testExecutableWorkingPath) const;
+    void setSourceRootDirectory(const QString &value);
+    bool getRunTestOnExecutableChange() const;
+    void setRunTestOnExecutableChange(bool value);
+
+    QString getAbsolutePathRelativeToSettingsFile(QString relative) const;
+
+    void testAbsolutePath();
 
 };
 

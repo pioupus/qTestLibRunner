@@ -23,3 +23,7 @@ HEADERS  += mainwindow.h \
 
 FORMS    += mainwindow.ui \
     settingswindow.ui
+
+QMAKE_CXXFLAGS += -std=c++14
+
+RESOURCES = resoureces.qrc

@@ -5,6 +5,7 @@
 #include <QTreeWidgetItem>
 #include <QSettings>
 #include <QMenu>
+#include <QLabel>
 #include "settingswindow.h"
 #include "settings.h"
 
@@ -62,8 +63,8 @@ public:
 
 
     bool runTests();
-    QList<TestCaseEntry> parseXML(QString xmlinput);
-    void listTestResults(QList<TestCaseEntry> testResults);
+    QList<TestCaseEntry> parseXML(QString xmlinput, QString testExecutable, QString testExecutableWorkingDir);
+    void listTestResults(QList<TestCaseEntry> testResults, bool totalSuccess);
 
 
 
@@ -83,6 +84,7 @@ private:
     QSettings *sysSettings;
     RecentFiles *recentFiles;
     int timerId;
+    QLabel *statusLabel;
 
     void saveAs(QString fileName);
     void openFile(QString fileName);

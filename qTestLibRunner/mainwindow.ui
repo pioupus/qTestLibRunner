@@ -11,10 +11,24 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>MainWindow</string>
+   <string>qTestLibRunner 1.0</string>
+  </property>
+  <property name="windowIcon">
+   <iconset>
+    <normaloff>:/prefix/smile_happy.ico</normaloff>:/prefix/smile_happy.ico</iconset>
   </property>
   <widget class="QWidget" name="centralWidget">
    <layout class="QGridLayout" name="gridLayout">
+    <item row="1" column="0">
+     <widget class="QPlainTextEdit" name="txtLog">
+      <property name="readOnly">
+       <bool>true</bool>
+      </property>
+      <property name="tabStopWidth">
+       <number>80</number>
+      </property>
+     </widget>
+    </item>
     <item row="0" column="0">
      <widget class="QTreeWidget" name="treeWidget">
       <column>

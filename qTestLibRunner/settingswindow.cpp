@@ -7,14 +7,15 @@ SettingsWindow::SettingsWindow(Settings *settings, QWidget *parent) : QDialog(pa
 {
     ui->setupUi(this);
     this->settings = settings;
-    ui->edtTestsSearchDir->setText(settings->searchPathForTestExecutable);
-    ui->edtTestsSearchMask->setText(settings->searchMaskForTestExecutable);
-    ui->edtTestWorkingDir->setText(settings->workingPathForTestExecutable);
-    ui->edtSourceRootDir->setText(settings->sourceRootDirectory);
-    ui->edtQTCreatorPath->setText(settings->qtCreatorPath);
-    ui->chbRunOnChange->setChecked(settings->runTestOnExecutableChange);
+    ui->pushButton->setVisible(false);
+    ui->edtTestsSearchDir->setText(settings->getSearchPathForTestExecutableRelative());
+    ui->edtTestsSearchMask->setText(settings->getSearchMaskForTestExecutable());
+    ui->edtTestWorkingDir->setText(settings->getWorkingPathForTestExecutableRelative());
+    ui->edtSourceRootDir->setText(settings->getSourceRootDirectoryRelative());
+    ui->edtQTCreatorPath->setText(settings->getQtCreatorPath());
+    ui->chbRunOnChange->setChecked(settings->getRunTestOnExecutableChange());
     ui->txtPathEnvironment->clear();
-    ui->txtPathEnvironment->append(settings->pathEnvironment.join("\n"));
+    ui->txtPathEnvironment->append(settings->getPathEnvironment().join("\n"));
     testExecutables = new TestExecutables(settings->testExecutables);
     loadTestExecutablesInList();
 }
@@ -28,14 +29,17 @@ SettingsWindow::~SettingsWindow()
 
 void SettingsWindow::on_buttonBox_accepted()
 {
-    settings->searchPathForTestExecutable =  ui->edtTestsSearchDir->text();
-    settings->searchMaskForTestExecutable =  ui->edtTestsSearchMask->text();
-    settings->workingPathForTestExecutable =  ui->edtTestWorkingDir->text();
-    settings->sourceRootDirectory =  ui->edtSourceRootDir->text();
-    settings->qtCreatorPath =  ui->edtQTCreatorPath->text();
-    settings->runTestOnExecutableChange = ui->chbRunOnChange->isChecked();
-    settings->pathEnvironment.clear();
-    settings->pathEnvironment.append(ui->txtPathEnvironment->toPlainText().split('\n'));
+    QStringList pathEnvironment;
+    settings->setSearchPathForTestExecutable(ui->edtTestsSearchDir->text());
+    settings->setSearchMaskForTestExecutable(ui->edtTestsSearchMask->text());
+    settings->setWorkingPathForTestExecutable(ui->edtTestWorkingDir->text());
+    settings->setSourceRootDirectory(ui->edtSourceRootDir->text());
+    settings->setQtCreatorPath(ui->edtQTCreatorPath->text());
+    settings->setRunTestOnExecutableChange(ui->chbRunOnChange->isChecked());
+    //settings->setPathEnvironment.clear();
+    pathEnvironment.append(ui->txtPathEnvironment->toPlainText().split('\n'));
+    //qDebug() << pathEnvironment.count();
+    settings->setPathEnvironment(pathEnvironment);
     settings->testExecutables.load(*testExecutables);
 }
 
@@ -52,7 +56,7 @@ void SettingsWindow::loadTestExecutablesInList(){
 void SettingsWindow::on_toolButton_clicked()
 {
     testExecutables->executableFilter = ui->edtTestsSearchMask->text();
-    testExecutables->rootPath = ui->edtTestsSearchDir->text();
+    testExecutables->rootPath = settings->getAbsolutePath(ui->edtTestsSearchDir->text(),"",ui->edtTestWorkingDir->text());
 
     testExecutables->scanDirectory();
     loadTestExecutablesInList();
@@ -66,5 +70,5 @@ void SettingsWindow::on_toolButton_clicked()
 
 void SettingsWindow::on_pushButton_clicked()
 {
-
+    settings->testAbsolutePath();
 }
