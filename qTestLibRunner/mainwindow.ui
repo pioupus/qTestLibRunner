@@ -18,18 +18,8 @@
     <normaloff>:/prefix/smile_happy.ico</normaloff>:/prefix/smile_happy.ico</iconset>
   </property>
   <widget class="QWidget" name="centralWidget">
-   <layout class="QGridLayout" name="gridLayout">
-    <item row="1" column="0">
-     <widget class="QPlainTextEdit" name="txtLog">
-      <property name="readOnly">
-       <bool>true</bool>
-      </property>
-      <property name="tabStopWidth">
-       <number>80</number>
-      </property>
-     </widget>
-    </item>
-    <item row="0" column="0">
+   <layout class="QVBoxLayout" name="verticalLayout">
+    <item>
      <widget class="QTreeWidget" name="treeWidget">
       <column>
        <property name="text">
@@ -52,6 +42,27 @@
        </property>
       </column>
      </widget>
+    </item>
+    <item>
+     <layout class="QHBoxLayout" name="horizontalLayout">
+      <item>
+       <widget class="QPlainTextEdit" name="txtLog">
+        <property name="textInteractionFlags">
+         <set>Qt::TextBrowserInteraction</set>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QListWidget" name="listLinks">
+        <property name="maximumSize">
+         <size>
+          <width>250</width>
+          <height>16777215</height>
+         </size>
+        </property>
+       </widget>
+      </item>
+     </layout>
     </item>
    </layout>
   </widget>

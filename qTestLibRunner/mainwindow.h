@@ -3,6 +3,7 @@
 
 #include <QMainWindow>
 #include <QTreeWidgetItem>
+#include <QListWidgetItem>
 #include <QSettings>
 #include <QMenu>
 #include <QLabel>
@@ -63,12 +64,14 @@ public:
 
 
     bool runTests();
-    QList<TestCaseEntry> parseXML(QString xmlinput, QString testExecutable, QString testExecutableWorkingDir);
+    QList<TestCaseEntry> parseXML(QString xmlinput, QString testExecutable, QString testExecutableWorkingDir, QString &unXMLedText);
     void listTestResults(QList<TestCaseEntry> testResults, bool totalSuccess);
 
 
 
 
+    void addFileLinks(QString xmlinput, QString rootpath);
+    void runqtCreator(QString link);
 private slots:
     void on_btnRun_clicked();
     void on_actionEditSettings_Triggered(bool checked = false);
@@ -76,6 +79,8 @@ private slots:
     void on_actionSave_as_Triggered(bool checked);
     void on_treeWidget_itemDoubleClicked(QTreeWidgetItem *item, int column);
     void on_actionRecentFile_Triggered(bool checked);
+
+    void on_listLinks_itemDoubleClicked(QListWidgetItem *item);
 
 private:
     Ui::MainWindow *ui;

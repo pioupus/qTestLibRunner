@@ -3,6 +3,7 @@
 
 #include "settingswindow.h"
 
+#include <QRegExp>
 #include <QProcess>
 #include <QtDebug>
 #include <QDomDocument>
@@ -255,18 +256,59 @@ bool MainWindow::runTests(){
             totalSuccess = false;
         }
 
+        if (testProcess.exitCode() != QProcess::NormalExit){
+            ui->txtLog->appendHtml("<font color=\"red\">program exited with code " +QString::number(testProcess.exitCode())+"</font>");
+            totalSuccess = false;
+        }
+
         testOutPut += stdout_;
 
         QByteArray err = testProcess.readAllStandardError();
         if (QString(err)!=""){
-            ui->txtLog->appendHtml("<font color=\"red\">program wrote on stderr: " +QString(err)+"</font>");
+            ui->txtLog->appendHtml("<font color=\"red\">program wrote on stderr: <br>" +QString(err)+"</font>");
             totalSuccess = false;
         }
-        testResults.append(parseXML(QString(testOutPut),program,workingdir));
+
+        QString unXMLedText;
+        testResults.append(parseXML(QString(testOutPut),program,workingdir,unXMLedText));
+        if (unXMLedText != ""){
+            //qDebug() << "hallo";
+            ui->txtLog->appendHtml("<b>it printed:</b>");
+            unXMLedText.replace("\n","<br>");
+            ui->txtLog->appendHtml("<font color=\"red\">" +QString(unXMLedText)+"</font>");
+            addFileLinks(unXMLedText,settings->getSourceRootDirectoryAbsolute(program,workingdir));
+        }
         ui->txtLog->appendPlainText("");
     }
     listTestResults(testResults,totalSuccess);
     return true;
+}
+
+void MainWindow::addFileLinks(QString xmlinput,QString rootpath){
+    qDebug() << xmlinput;
+   QRegExp rx(".cpp:\\d+: ");//QRegExp rx(".cpp:\\d+: ");
+   QString str = xmlinput;
+   QStringList list;
+   int pos = 0;
+
+   while ((pos = rx.indexIn(str, pos)) != -1) {
+
+       int posstart = str.lastIndexOf("<br>",pos);
+       int poslength = pos-posstart+rx.matchedLength();
+       list << str.mid(posstart+4,poslength-6);
+       pos += rx.matchedLength();
+
+   }
+   ui->listLinks->setVisible(list.count()>0);
+   ui->listLinks->clear();
+   for(int i=0;i< list.count();i++){
+       QListWidgetItem *item;
+       ui->listLinks->addItem(list[i]);
+       item = ui->listLinks->item(ui->listLinks->count()-1);
+       item->setData(Qt::ToolTipRole, rootpath+'/'+list[i]);
+   }
+
+
 }
 
 QString removeXMLEncodingTag(QString in){
@@ -283,7 +325,7 @@ QString removeXMLEncodingTag(QString in){
 //<?xml version="1.0" encoding="UTF-8"?>
 }
 
-QList<TestCaseEntry> MainWindow::parseXML(QString xmlinput, QString testExecutable, QString testExecutableWorkingDir){
+QList<TestCaseEntry> MainWindow::parseXML(QString xmlinput, QString testExecutable, QString testExecutableWorkingDir, QString &unXMLedText){
 #if 0
     <?xml version="1.0" encoding="UTF-8"?>
     <TestCase name="TestScriptEngine">
@@ -348,8 +390,10 @@ QList<TestCaseEntry> MainWindow::parseXML(QString xmlinput, QString testExecutab
     QDomNode testCases = docElem.firstChild();
     QList<TestCaseEntry> testCasesList;
 
+    unXMLedText = docElem.text();
     while(!testCases.isNull()) {
         QDomElement testCase = testCases.toElement(); // try to convert the node to an element.
+
         if(!testCase.isNull()) {
             TestCaseEntry testCaseEntry;
             testCaseEntry.name = testCase.attribute("name");
@@ -486,25 +530,35 @@ void MainWindow::listTestResults(QList<TestCaseEntry> testResults, bool totalSuc
 
 }
 
+void MainWindow::runqtCreator(QString link){
+    QStringList arguments;
+    arguments <<"-client" << link;
+    QProcess::startDetached(settings->getQtCreatorPath(), arguments);
+}
+
 void MainWindow::on_treeWidget_itemDoubleClicked(QTreeWidgetItem *item, int column)
 {
     (void)column;
     if( QTreeWidgetItemWithData* itemWithData = dynamic_cast< QTreeWidgetItemWithData* >( item ) )
     {
         if(itemWithData->testFunctionEntry.fileName != ""){
-            QStringList arguments;
+
             //QString path = "C:/Qt/Qt5.4.1/Tools/QtCreator/bin/";
             QString sourceDirectory = itemWithData->testCaseEntry.testSourceDirectory;
             QDir qpath(sourceDirectory);
             QString sourceFileAbs = sourceDirectory+'/'+itemWithData->testFunctionEntry.fileName;//qpath.relativeFilePath(itemWithData->testFunctionEntry.fileName);
             //qDebug() << sourceFileAbs;
-            arguments <<"-client" <<sourceFileAbs+':'+itemWithData->testFunctionEntry.lineNumber;
-            QProcess::startDetached(settings->getQtCreatorPath(), arguments);
+            QString link = sourceFileAbs+':'+itemWithData->testFunctionEntry.lineNumber;
+            runqtCreator(link);
         }
     }
 }
 
-
+void MainWindow::on_listLinks_itemDoubleClicked(QListWidgetItem *item)
+{
+    QString link(item->data(Qt::ToolTipRole).toString());
+    runqtCreator(link);
+}
 
 RecentFiles::RecentFiles(QStringList initList)
 {
@@ -528,6 +582,8 @@ void RecentFiles::addToRecentFiles(QString fileName)
     }
 
 }
+
+
 
 
 
