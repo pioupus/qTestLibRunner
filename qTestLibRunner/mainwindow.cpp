@@ -120,7 +120,12 @@ void MainWindow::on_actionSave_as_Triggered(bool checked){
     dial.setNameFilter(tr("QTest Runner Settings (*.qtr)"));
     dial.setFileMode(QFileDialog::AnyFile);
     if (dial.exec()) {
-        saveAs(dial.selectedFiles()[0]);
+        QFileInfo fname(dial.selectedFiles()[0]);
+        if (fname.suffix() != "qtr"){
+            saveAs(fname.absoluteFilePath()+".qtr");
+        }else{
+            saveAs(fname.absoluteFilePath());
+        }
     }
 }
 
