@@ -182,6 +182,19 @@ void MainWindow::on_actionEditSettings_Triggered(bool checked)
 
 #endif
 
+QString findUnXMLedString(QString in){
+    (void)in;
+    QRegExp reg("</.+>");
+    QString result="";
+    int pos;
+    pos = reg.lastIndexIn(in);
+    if (pos>-1){
+        result = in.mid(pos+reg.matchedLength(),in.length());
+        result = result.trimmed();
+    }
+    return result;
+}
+
 bool MainWindow::runTests(){
 
     QProcess testProcess;
@@ -199,11 +212,9 @@ bool MainWindow::runTests(){
     if (paths.count() > 0){
         bool pathNotfound = true;
         ui->txtLog->appendHtml("<b>Adding to Path:</b>");
-
         for(int i=0;i<paths.count();i++){
             //qDebug() << paths[i];
-            ui->txtLog->appendPlainText(paths[i]);
-
+            ui->txtLog->appendHtml("<font color=\"black\">"+paths[i]+"</font>");
         }
         for (int i=0;i<env.count();i++){
             if (env[i].indexOf("PATH=") == 0){
@@ -251,6 +262,7 @@ bool MainWindow::runTests(){
             //qDebug() << "finished problem";
         }
         QByteArray stdout_ = testProcess.readAllStandardOutput();
+        //qDebug() << stdout_;
         if (QString(stdout_)==""){
             ui->txtLog->appendHtml("<font color=\"red\">program didnt generate output on stdout</font>");
             totalSuccess = false;
@@ -264,42 +276,60 @@ bool MainWindow::runTests(){
         testOutPut += stdout_;
 
         QByteArray err = testProcess.readAllStandardError();
-        if (QString(err)!=""){
-            ui->txtLog->appendHtml("<font color=\"red\">program wrote on stderr: <br>" +QString(err)+"</font>");
+        QString errorOutput=QString(err);
+        errorOutput.replace("\n","<br>");
+        if (errorOutput!=""){
+            ui->txtLog->appendHtml("<font color=\"red\">program wrote on stderr: <br>" +errorOutput+"</font>");
             totalSuccess = false;
         }
 
-        QString unXMLedText;
-        testResults.append(parseXML(QString(testOutPut),program,workingdir,unXMLedText));
+        QString unXMLedText = findUnXMLedString(QString(stdout_));
+        testResults.append(parseXML(QString(stdout_),program,workingdir));
+        ui->listLinks->clear();
         if (unXMLedText != ""){
             //qDebug() << "hallo";
-            ui->txtLog->appendHtml("<b>it printed:</b>");
+            ui->txtLog->appendHtml("<font color=\"black\"><b>it printed:</b></font>");
             unXMLedText.replace("\n","<br>");
             ui->txtLog->appendHtml("<font color=\"red\">" +QString(unXMLedText)+"</font>");
-            addFileLinks(unXMLedText,settings->getSourceRootDirectoryAbsolute(program,workingdir));
         }
+        if ((unXMLedText != "") || (errorOutput != "" )){
+            addFileLinks(unXMLedText+errorOutput,settings->getSourceRootDirectoryAbsolute(program,workingdir));
+        }
+        ui->listLinks->setVisible(ui->listLinks->count()>0);
+        ui->lblLink->setVisible(ui->listLinks->count()>0);
         ui->txtLog->appendPlainText("");
     }
     listTestResults(testResults,totalSuccess);
     return true;
 }
 
+    QStringList searchFileLinks(QString xmlinput){
+        //qDebug() << xmlinput;
+       QRegExp rx(".cpp:\\d+: ");//QRegExp rx(".cpp:\\d+: ");
+       QString str = "<br>"+xmlinput;
+       QStringList list;
+       int pos = 0;
+
+       while ((pos = rx.indexIn(str, pos)) != -1) {
+
+           int posstart = str.lastIndexOf("<br>",pos);
+           int deleteoffset = 4;
+           if (posstart < str.lastIndexOf(":",pos)){
+               posstart = str.lastIndexOf(":",pos);
+               deleteoffset=1;
+           }
+           int poslength = pos-posstart+rx.matchedLength();
+           list << str.mid(posstart+deleteoffset,poslength-6).trimmed();
+           pos += rx.matchedLength();
+
+       }
+
+        return list;
+    }
+
 void MainWindow::addFileLinks(QString xmlinput,QString rootpath){
-    qDebug() << xmlinput;
-   QRegExp rx(".cpp:\\d+: ");//QRegExp rx(".cpp:\\d+: ");
-   QString str = xmlinput;
    QStringList list;
-   int pos = 0;
-
-   while ((pos = rx.indexIn(str, pos)) != -1) {
-
-       int posstart = str.lastIndexOf("<br>",pos);
-       int poslength = pos-posstart+rx.matchedLength();
-       list << str.mid(posstart+4,poslength-6);
-       pos += rx.matchedLength();
-
-   }
-   ui->listLinks->setVisible(list.count()>0);
+   list = searchFileLinks(xmlinput);
    ui->listLinks->clear();
    for(int i=0;i< list.count();i++){
        QListWidgetItem *item;
@@ -307,8 +337,6 @@ void MainWindow::addFileLinks(QString xmlinput,QString rootpath){
        item = ui->listLinks->item(ui->listLinks->count()-1);
        item->setData(Qt::ToolTipRole, rootpath+'/'+list[i]);
    }
-
-
 }
 
 QString removeXMLEncodingTag(QString in){
@@ -325,7 +353,7 @@ QString removeXMLEncodingTag(QString in){
 //<?xml version="1.0" encoding="UTF-8"?>
 }
 
-QList<TestCaseEntry> MainWindow::parseXML(QString xmlinput, QString testExecutable, QString testExecutableWorkingDir, QString &unXMLedText){
+QList<TestCaseEntry> MainWindow::parseXML(QString xmlinput, QString testExecutable, QString testExecutableWorkingDir){
 #if 0
     <?xml version="1.0" encoding="UTF-8"?>
     <TestCase name="TestScriptEngine">
@@ -347,6 +375,12 @@ QList<TestCaseEntry> MainWindow::parseXML(QString xmlinput, QString testExecutab
             <Duration msecs="0.438558"/>
         </TestFunction>
         <TestFunction name="runScriptGettingStarted">
+            <Message type="qwarn" file="" line="0">
+                <Description><![CDATA[..\..\..\tests\testScriptEngine.cpp:86: Failure
+            Actual function call count doesnt match EXPECT_CALL(m_pysys, print(QVariant("Test")))...
+                     Expected: to be called at least once
+                       Actual: never called - unsatisfied and active]]></Description>
+            </Message>
         <Incident type="pass" file="" line="0" />
             <Duration msecs="0.010229"/>
         </TestFunction>
@@ -390,7 +424,6 @@ QList<TestCaseEntry> MainWindow::parseXML(QString xmlinput, QString testExecutab
     QDomNode testCases = docElem.firstChild();
     QList<TestCaseEntry> testCasesList;
 
-    unXMLedText = docElem.text();
     while(!testCases.isNull()) {
         QDomElement testCase = testCases.toElement(); // try to convert the node to an element.
 
@@ -408,6 +441,15 @@ QList<TestCaseEntry> MainWindow::parseXML(QString xmlinput, QString testExecutab
                     if(!testFunction.isNull()) {
                         if (testFunction.tagName() == "TestFunction"){
                            testFunctionEntry.name = testFunction.attribute("name");
+                           testFunctionEntry.description = "";
+                           QDomElement testMessage = testFunction.firstChildElement("Message");
+                           QDomNodeList testMessageDescriptions = testMessage.elementsByTagName("Description");
+                           if (testMessageDescriptions.count() > 0){
+                               QDomElement testMessageDescription = testMessageDescriptions.at(0).toElement();
+                               //testFunctionEntry.description = testMessageDescription.text();
+
+                           }
+
                            QDomElement testIncident = testFunction.firstChildElement("Incident");
                            testFunctionEntry.passed = testIncident.attribute("type") == "pass";
                            testFunctionEntry.fileName = testIncident.attribute("file");
@@ -421,11 +463,22 @@ QList<TestCaseEntry> MainWindow::parseXML(QString xmlinput, QString testExecutab
                            QDomNodeList testIncidentDescriptions = testFunction.elementsByTagName("Description");
                            if (testIncidentDescriptions.count() > 0){
                                QDomElement testIncidentDescription = testIncidentDescriptions.at(0).toElement();
-                               testFunctionEntry.description = testIncidentDescription.text();
+                               testFunctionEntry.description += testIncidentDescription.text();
 
                            }
-
+                           if (testFunctionEntry.description.contains("fail",Qt::CaseInsensitive)){
+                               testFunctionEntry.passed = false;
+                           }
+                           if ((testFunctionEntry.passed == false)&&(testFunctionEntry.fileName=="")){
+                                QStringList filelist = searchFileLinks(testFunctionEntry.description);
+                                if (filelist.count()){
+                                    QString fn =  filelist[0];
+                                    testFunctionEntry.fileName = fn.left(fn.indexOf(":"));
+                                    testFunctionEntry.lineNumber = fn.mid(fn.indexOf(":")+1,fn.length());
+                                }
+                           }
                            testCaseEntry.testFunctionList.append(testFunctionEntry);
+
 
                         }
                         //qDebug() << qPrintable(testFunction.tagName()) << qPrintable(testFunction.attribute("name")) << endl; // the node really is an element.

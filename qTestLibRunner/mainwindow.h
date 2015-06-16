@@ -64,7 +64,7 @@ public:
 
 
     bool runTests();
-    QList<TestCaseEntry> parseXML(QString xmlinput, QString testExecutable, QString testExecutableWorkingDir, QString &unXMLedText);
+    QList<TestCaseEntry> parseXML(QString xmlinput, QString testExecutable, QString testExecutableWorkingDir);
     void listTestResults(QList<TestCaseEntry> testResults, bool totalSuccess);
 
 
